@@ -3749,7 +3749,11 @@ SSCHECK(){
 
 FIREWALL(){
 
-  iptables_vnxL="$1/sos_commands/networking/iptables_-vnxL"
+  #iptables_vnxL="$1/sos_commands/networking/iptables_-vnxL"
+  iptables_raw_nvL="$1/sos_commands/networking/iptables_-t_raw_-nvL"
+  iptables_nat_nvL="$1/sos_commands/networking/iptables_-t_nat_-nvL"
+  iptables_mangle_nvL="$1/sos_commands/networking/iptables_-t_mangle_-nvL"
+  iptables_filter_nvL="$1/sos_commands/networking/iptables_-t_filter_-nvL"
   firewallcmd_state="$1/sos_commands/firewalld/firewall-cmd_--state"
   nft_list_ruleset="$(echo $1/sos_commands/*/nft_list_ruleset)"
   nft_list_ruleset=${nft_list_ruleset%% *}
@@ -3765,7 +3769,13 @@ FIREWALL(){
   declare -A nftables=$(__retrieve_service_status nftables)
   declare -A firewalld=$(__retrieve_service_status firewalld)
 
-  iptables[rules]=$(cat $iptables_vnxL 2>/dev/null | egrep -v '^$|^Chain|pkts *bytes' | wc -l)
+  #iptables[rules]=$(cat $iptables_vnxL 2>/dev/null | egrep -v '^$|^Chain|pkts *bytes' | wc -l)
+  iptables[rules_raw]=$(cat $iptables_raw_nvL 2>/dev/null | egrep -v '^$|^Chain|pkts *bytes' | wc -l)
+  iptables[rules_nat]=$(cat $iptables_nat_nvL 2>/dev/null | egrep -v '^$|^Chain|pkts *bytes' | wc -l)
+  iptables[rules_mangle]=$(cat $iptables_mangle_nvL 2>/dev/null | egrep -v '^$|^Chain|pkts *bytes' | wc -l)
+  iptables[rules_filter]=$(cat $iptables_filter_nvL 2>/dev/null | egrep -v '^$|^Chain|pkts *bytes' | wc -l)
+  iptables[rules]=$((${iptables[rules_raw]}+${iptables[rules_nat]}+${iptables[rules_mangle]}+${iptables[rules_filter]}))
+
   nftables[rules]=$(cat $nft_list_ruleset 2>/dev/null | egrep -v '^table|^$|\t*chain.*{$|\t*}$' | wc -l)
 
   echo -e "${c[H1]}FIREWALL${c[0]}"
@@ -3780,8 +3790,14 @@ FIREWALL(){
 
   echo -e "\n$XSOS_INDENT_H1${c[H2]}Rules loaded:${c[0]}"
   if [ "${iptables[rules]}${nftables[rules]}" -gt 0 ]; then
-    if [ "${iptables[rules]}" -gt 0 ]; then echo -e "${XSOS_INDENT_H2}iptables: ${iptables[rules]}"; fi
+
+    if [ "${iptables[rules]}" -gt 0 ]; then
+      echo -ne "${XSOS_INDENT_H2}iptables:"
+      for table in raw mangle filter nat; do echo -ne " ${table} ${iptables[rules_$table]},"; done | sed 's/,$/\./'; echo
+    fi
+
     if [ "${nftables[rules]}" -gt 0 ]; then echo -e "${XSOS_INDENT_H2}nftables: ${nftables[rules]}"; fi
+
   else
     echo -e "${XSOS_INDENT_H2}No rules loaded."
   fi
